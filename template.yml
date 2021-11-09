@@ -1,0 +1,96 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Provision serverless AWS webredirect - https://zoph.io
+############################################################
+Parameters:
+############################################################
+  pSourceDomain:
+    Description: "DomainName used as source, example: asd.zoph.io"
+    Type: String
+
+  pR53ZoneID:
+    Description: Source Domain Route53 Hosted Zone Id
+    Type: String
+
+  pTargetURL:
+    Description: "Target URL used for webredirect WITHOUT http:// or https://"
+    Type: String
+
+###########################################################
+Mappings:
+###########################################################
+  S3HostedZoneId:
+    us-east-1:
+      HostedZoneId: Z3AQBSTGFYJSTF
+    us-east-2:
+      HostedZoneId: Z2O1EMRO9K5GLX
+    us-west-1:
+      HostedZoneId: Z2F56UZL2M1ACD
+    us-west-2:
+      HostedZoneId: Z3BJ6K6RIION7M
+    af-south-1:
+      HostedZoneId: Z83WF9RJE8B12
+    ap-east-1:
+      HostedZoneId: ZNB98KWMFR0R6
+    ap-south-1:
+      HostedZoneId: Z11RGJOFQNVJUP
+    ap-northeast-3:
+      HostedZoneId: Z2YQB5RD63NC85
+    ap-northeast-2:
+      HostedZoneId: Z3W03O7B5YMIYP
+    ap-southeast-1:
+      HostedZoneId: Z3O0J2DXBE1FTB
+    ap-southeast-2:
+      HostedZoneId: Z1WCIGYICN2BYD
+    ap-northeast-1:
+      HostedZoneId: Z2M4EHUR26P7ZW
+    ca-central-1:
+      HostedZoneId: Z1QDHH18159H29
+    cn-northwest-1:
+      HostedZoneId: Z282HJ1KT0DH03
+    eu-central-1:
+      HostedZoneId: Z21DNDUVLTQW6Q
+    eu-west-1:
+      HostedZoneId: Z1BKCTXD74EZPE
+    eu-west-2:
+      HostedZoneId: Z3GKZC51ZF0DB4
+    eu-south-1:
+      HostedZoneId: Z30OZKI7KPW7MI
+    eu-west-3:
+      HostedZoneId: Z3R1K369G5AVDG
+    eu-north-1:
+      HostedZoneId: Z3BAZG2TWCNX0D
+    me-south-1:
+      HostedZoneId: Z1MPMWCPA7YB62
+    sa-east-1:
+      HostedZoneId: Z7KQH4QJS55SO
+    us-gov-east-1:
+      HostedZoneId: Z2NIFVYYW2VKV1
+    us-gov-west-1:
+      HostedZoneId: Z31GFT0UA1I2HV
+
+############################################################
+Resources:
+############################################################
+  RedirectBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Ref pSourceDomain
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'AES256'
+      WebsiteConfiguration:
+        RedirectAllRequestsTo:
+          HostName: !Ref pTargetURL
+
+  Route53Record:
+    Type: 'AWS::Route53::RecordSetGroup'
+    Properties:
+      HostedZoneId: !Ref pR53ZoneID
+      RecordSets:
+        - Name: !Ref pSourceDomain
+          Type: A
+          AliasTarget:
+            HostedZoneId: !FindInMap [ S3HostedZoneId, !Ref "AWS::Region", HostedZoneId ]
+            DNSName: !Sub s3-website-${AWS::Region}.amazonaws.com
