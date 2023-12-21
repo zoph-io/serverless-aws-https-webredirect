@@ -6,7 +6,7 @@ help:
 	@echo "${Description}"
 	@echo ""
 	@echo "Deploy using this order:"
-	@echo "	deploy - deploy unusd.cloud"
+	@echo "	deploy - deploy serverless-aws-webredirect stack"
 	@echo "	---"
 	@echo "	tear-down - destroy the CloudFormation stack"
 	@echo "	clean - clean temp folders"
