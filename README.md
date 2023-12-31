@@ -1,50 +1,106 @@
-# Serverless AWS HTTP Webredirect
+# Serverless AWS WebRedirect
 
-## Rational
+## 📣 Intro
 
-Deploy a serverless `http` web redirect using an S3 bucket and a Route53 record.
+Previously, this blueprint used Route53 record associated with a static web hosting enabled S3 bucket. The trade-off of this pattern was it only supports `HTTP` protocol. Red flag 🚩
 
-## Sample
+Nowadays, there is are much better options using Amazon CloudFront and CloudFront function. It's still serverless and supports `HTTPS` natively. It also enables new capabilities thanks to the newly released [KeyValue Store](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html) feature in CloudFront.
 
-```bash
-> http asd.zoph.io
-HTTP/1.1 301 Moved Permanently
-Content-Length: 0
-Date: Tue, 09 Nov 2021 14:00:29 GMT
-Location: http://app.mailbrew.com/zoph/aws-security-digest-HrkhwqNrwBBk/
-Server: AmazonS3
-```
+This revised version will let you redirect subdomains to any other APEX domain, subdomains or URL.
 
-## Schema
+### Features
 
-![Architecture schema](./assets/schema.png)
+- **URL Redirect**: Redirect multiple source subdomains to target URLs
+- **Easy URLs Management**: Manage target URLs directly using the CloudFront AWS Console
 
-## Prerequisite
+Examples:
 
-1. AWS Account
-2. Route53 hosted domain name
+- `blog.zoph.io` -> `https://zoph.me`
+- `asd.zoph.io` -> `https://awssecuritydigest.com`
+- `book.zoph.io` -> `https://calendly.com/zophio/30min-meeting/`
 
-## Deployment
+## 📐 Schema
 
-### Fill following parameters in the `Makefile`
+![Architecture schema](./assets/arch-schema.drawio.png)
 
-> set your own values
+## 🧱 AWS Building Blocks
+
+> ℹ️ The following assets will be deployed to your AWS account.
+
+1. CloudFront Distribution
+2. CloudFront Function
+3. CloudFront KeyValueStore
+4. S3 Buckets
+5. S3 Bucket Policy
+6. Route53 Records
+
+### ⌨️ Configuration
+
+> ℹ️ Fill following parameters in the `Makefile` with your own values.
 
 ```bash
 ###################### Parameters ######################
-Description ?= serverless-aws-webredirect stack
-AWSRegion ?= eu-west-1
-SourceDomain ?= asd.zoph.io
-R53HostedZoneId ?= Z1BPJ52MEEG8XX
-TargetURL ?= zoph.io
+ProjectName := "my-project-name" # Give a name for your project
+AWSRegion := eu-west-1 # AWS Region used for deployment
+SourceNakedDomain := domain.tld # Source domain
+SourceSubDomainList := "sub1,sub2" # Source subdomains
+R53HostedZoneId := Z1BPJ52MEEXXXX # Source domain R53 hosted zone id
+# Use Wildcard Certificate if multiple subdomains
+CertificateArn := "arn:aws:acm:us-east-1:...." # us-east-1 Arn of ACM Public Certificate associated
 #######################################################
 ```
-> run the following command (where your AWS CLI is authencated)
 
+#### Setup Redirection targets
+
+> ℹ️ Update the `config.json` file according to your needs
+
+```json
+{
+  "data": [
+    {
+      "key": "sub1.domain.tld",
+      "value": "google.com"
+    },
+    {
+      "key": "sub2.domain.tld",
+      "value": "aws.amazon.com/cloudfront/"
+    }
+  ]
+}
+```
+
+### ⌨️ Deployment
+
+> ℹ️ Run the following command (where your AWS CLI is authencated)
+
+```bash
+    $ make config_store
     $ make deploy
+```
 
-> give a try: `curl -I http://<your_source_domain>`
+> Give a try with this command: `$ make test`
 
-## Credits
+### 📝 Update target URLs (Console)
 
-- Victor GRENU ([@zoph](https://twitter.com/zoph)) from [zoph.io](https://github.com/zoph-io)
+> ℹ️ You will be able to change target url using the CloudFront Console, in the KeyValueStores section
+
+![Screenshot](./assets/screenshot01.png)
+
+### ❌ Remove
+
+```bash
+    $ make tear-down
+```
+
+## 🎖️ Credits
+
+- 🏴‍☠️ AWS Security Boutique: [zoph.io](https://zoph.io?utm_source=serverless_redirect)
+- 💌 [AWS Security Digest Newsletter](https://awssecuritydigest.com?utm_source=serverless_redirect)
+- 🐦 𝕏/Twitter: [zoph](https://x.com/zoph)
+
+## 🤔 Inspiration
+
+- [AWS BlogPost: KeyValue Store](https://aws.amazon.com/blogs/aws/introducing-amazon-cloudfront-keyvaluestore-a-low-latency-datastore-for-cloudfront-functions/)
+- [AWS Documentation](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/example-function-redirect-url.html)
+- [CloudFormation Loop](https://aws.amazon.com/blogs/devops/exploring-fnforeach-and-fnfindinmap-enhancements-in-aws-cloudformation/)
+- [Multiple CNAME in CloudFront](https://repost.aws/es/questions/QUUq6yPeMNR6OSKrgXeWO8Mw/cloudformation-and-cloudfront-cname)

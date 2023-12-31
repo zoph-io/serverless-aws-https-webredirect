@@ -1,96 +1,189 @@
-AWSTemplateFormatVersion: '2010-09-09'
-Transform: 'AWS::Serverless-2016-10-31'
-Description: Provision serverless AWS webredirect - https://zoph.io
+AWSTemplateFormatVersion: "2010-09-09"
+Transform:
+  - "AWS::LanguageExtensions"
+  - "AWS::Serverless-2016-10-31"
+Description: "Serverless AWS webredirect (HTTPS) - https://zoph.io"
 ############################################################
 Parameters:
-############################################################
-  pSourceDomain:
-    Description: "DomainName used as source, example: asd.zoph.io"
+  ############################################################
+  pProductName:
+    Description: "Product Name"
     Type: String
 
-  pR53ZoneID:
+  pProjectName:
+    Description: "Project Name"
+    Type: String
+
+  pSourceDomain:
+    Description: "DomainName used as source"
+    Type: String
+
+  pSourceNakedDomain:
+    Description: "Source Naked DomainName"
+    Type: String
+
+  pSourceSubDomainList:
+    Description: "List of Source SubDomainNames used as source, comma separated"
+    Type: CommaDelimitedList
+
+  pSourceSubDomainListUrl:
+    Description: "List of Source SubDomainNames URLs used as source, comma separated"
+    Type: String
+
+  pR53ZoneId:
     Description: Source Domain Route53 Hosted Zone Id
     Type: String
 
-  pTargetURL:
-    Description: "Target URL used for webredirect WITHOUT http:// or https://"
+  pCertificateArn:
+    Description: "ACM Certificate Arn"
     Type: String
-
-###########################################################
-Mappings:
-###########################################################
-  S3HostedZoneId:
-    us-east-1:
-      HostedZoneId: Z3AQBSTGFYJSTF
-    us-east-2:
-      HostedZoneId: Z2O1EMRO9K5GLX
-    us-west-1:
-      HostedZoneId: Z2F56UZL2M1ACD
-    us-west-2:
-      HostedZoneId: Z3BJ6K6RIION7M
-    af-south-1:
-      HostedZoneId: Z83WF9RJE8B12
-    ap-east-1:
-      HostedZoneId: ZNB98KWMFR0R6
-    ap-south-1:
-      HostedZoneId: Z11RGJOFQNVJUP
-    ap-northeast-3:
-      HostedZoneId: Z2YQB5RD63NC85
-    ap-northeast-2:
-      HostedZoneId: Z3W03O7B5YMIYP
-    ap-southeast-1:
-      HostedZoneId: Z3O0J2DXBE1FTB
-    ap-southeast-2:
-      HostedZoneId: Z1WCIGYICN2BYD
-    ap-northeast-1:
-      HostedZoneId: Z2M4EHUR26P7ZW
-    ca-central-1:
-      HostedZoneId: Z1QDHH18159H29
-    cn-northwest-1:
-      HostedZoneId: Z282HJ1KT0DH03
-    eu-central-1:
-      HostedZoneId: Z21DNDUVLTQW6Q
-    eu-west-1:
-      HostedZoneId: Z1BKCTXD74EZPE
-    eu-west-2:
-      HostedZoneId: Z3GKZC51ZF0DB4
-    eu-south-1:
-      HostedZoneId: Z30OZKI7KPW7MI
-    eu-west-3:
-      HostedZoneId: Z3R1K369G5AVDG
-    eu-north-1:
-      HostedZoneId: Z3BAZG2TWCNX0D
-    me-south-1:
-      HostedZoneId: Z1MPMWCPA7YB62
-    sa-east-1:
-      HostedZoneId: Z7KQH4QJS55SO
-    us-gov-east-1:
-      HostedZoneId: Z2NIFVYYW2VKV1
-    us-gov-west-1:
-      HostedZoneId: Z31GFT0UA1I2HV
 
 ############################################################
 Resources:
-############################################################
+  ############################################################
   RedirectBucket:
-    Type: 'AWS::S3::Bucket'
+    Type: "AWS::S3::Bucket"
     Properties:
-      BucketName: !Ref pSourceDomain
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault:
-              SSEAlgorithm: 'AES256'
-      WebsiteConfiguration:
-        RedirectAllRequestsTo:
-          HostName: !Ref pTargetURL
+      BucketName: !Sub ${pSourceDomain}-${pProductName}
 
-  Route53Record:
-    Type: 'AWS::Route53::RecordSetGroup'
+  RedirectBucketPolicy:
+    Type: AWS::S3::BucketPolicy
     Properties:
-      HostedZoneId: !Ref pR53ZoneID
-      RecordSets:
-        - Name: !Ref pSourceDomain
+      Bucket: !Ref RedirectBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - s3:GetObject
+            Resource: !Sub arn:aws:s3:::${pSourceDomain}-${pProductName}/*
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution.Id}"
+
+  ConfigStorage:
+    Type: AWS::CloudFront::KeyValueStore
+    Properties:
+      Comment: !Sub serverless-redirect-config-store-${pProjectName}
+      ImportSource:
+        SourceArn: !Sub arn:aws:s3:::${pProductName}-${pProjectName}-config/config.json
+        SourceType: S3
+      Name: !Sub serverless-redirect-config-store-${pProjectName}
+
+  CloudFrontFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub Redirect-Function-${pProjectName}
+      FunctionConfig:
+        Comment: !Sub "Redirect function for ${pProjectName}"
+        Runtime: cloudfront-js-2.0
+        KeyValueStoreAssociations:
+          - KeyValueStoreARN: !GetAtt ConfigStorage.Arn
+      FunctionCode: !Sub |
+        import cf from "cloudfront";
+
+        const kvsId = '${ConfigStorage.Id}';
+        const kvsHandle = cf.kvs(kvsId);
+
+        function extractMainDomain(host) {
+          const parts = host.split(".");
+          return parts.length > 2
+            ? parts[parts.length - 2] + "." + parts[parts.length - 1]
+            : host;
+        }
+
+        async function handler(event) {
+          const request = event.request;
+          const host = request.headers.host.value;
+          console.log("Host: " + host);
+
+          let newUri = extractMainDomain(host); // Default to main domain
+
+          try {
+            const uriFromKvs = await kvsHandle.get(host);
+            if (uriFromKvs) {
+              newUri = uriFromKvs;
+            }
+            console.log("Target Uri: " + newUri);
+          } catch (err) {
+            console.log(request.uri + " | " + err);
+          }
+
+          const response = {
+            statusCode: 301,
+            statusDescription: "Moved Permanently",
+            headers: {
+              location: {
+                value: "https://" + newUri,
+              },
+            },
+          };
+
+          return response;
+        }
+      AutoPublish: true
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Sub ${pProductName}-${pProjectName}
+        Aliases:
+          Fn::Split:
+            - ","
+            - Ref: pSourceSubDomainListUrl
+        DefaultCacheBehavior:
+          TargetOriginId: s3-website
+          CachePolicyId: "4135ea2d-6df8-44a3-9df3-4b5a84be39ad" # CachingDisabled
+          ViewerProtocolPolicy: redirect-to-https
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt CloudFrontFunction.FunctionARN
+        Enabled: true
+        HttpVersion: "http2"
+        DefaultRootObject: "index.htm"
+        IPV6Enabled: true
+        Origins:
+          # Origin for static assests in S3
+          - Id: s3-website
+            DomainName: !GetAtt RedirectBucket.DomainName
+            S3OriginConfig:
+              OriginAccessIdentity:
+                Fn::Sub: ""
+            # Restricting Bucket access through origin access control
+            OriginAccessControlId: !GetAtt CloudFrontOAC.Id
+        PriceClass: "PriceClass_100"
+        ViewerCertificate:
+          AcmCertificateArn: !Ref "pCertificateArn"
+          MinimumProtocolVersion: "TLSv1.2_2021"
+          SslSupportMethod: "sni-only"
+      Tags:
+        - Key: Project
+          Value: !Ref pProjectName
+        - Key: Product
+          Value: !Ref pProductName
+
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub serverless-redirect-oac-${pProjectName}
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # A CloudFormation loop on the Route53Records for each subdomain
+  Fn::ForEach::Route53RecordSet:
+    - RecordSetLogicalId
+    - !Ref pSourceSubDomainList
+    - Route53RecordSet${RecordSetLogicalId}:
+        Type: AWS::Route53::RecordSet
+        Properties:
+          HostedZoneId: !Ref pR53ZoneId
+          Name: !Sub ${RecordSetLogicalId}.${pSourceNakedDomain}
           Type: A
           AliasTarget:
-            HostedZoneId: !FindInMap [ S3HostedZoneId, !Ref "AWS::Region", HostedZoneId ]
-            DNSName: !Sub s3-website-${AWS::Region}.amazonaws.com
+            HostedZoneId: Z2FDTNDATAQYW2 # Hosted zone ID for CloudFront
+            DNSName: !GetAtt CloudFrontDistribution.DomainName
