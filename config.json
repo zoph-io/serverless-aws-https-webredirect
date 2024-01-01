@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "key": "sub1.domain.tld",
+      "value": "google.fr"
+    },
+    {
+      "key": "sub2.domain.tld",
+      "value": "google.com"
+    },
+    {
+      "key": "blog.zoph.io",
+      "value": "zoph.me"
+    }
+  ]
+}

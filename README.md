@@ -74,7 +74,7 @@ CertificateArn := "arn:aws:acm:us-east-1:...." # us-east-1 Arn of ACM Public Cer
 > ℹ️ Run the following command (where your AWS CLI is authencated)
 
 ```bash
-    $ make config_store
+    $ make requirements
     $ make deploy
 ```
 
