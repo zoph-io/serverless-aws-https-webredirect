@@ -1,12 +1,12 @@
-# Serverless AWS WebRedirect
+# 🔀 Serverless AWS WebRedirect
 
 ## 📣 Intro
 
-Previously, this blueprint used Route53 record associated with a static web hosting enabled S3 bucket. The trade-off of this pattern was it only supports `HTTP` protocol. Red flag 🚩
+Previously, this blueprint used Route53 records associated with a static web hosting-enabled S3 bucket. The trade-off of this pattern was it only supports `HTTP` protocol. Red flag 🚩
 
-Nowadays, there is are much better options using Amazon CloudFront and CloudFront function. It's still serverless and supports `HTTPS` natively. It also enables new capabilities thanks to the newly released [KeyValue Store](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html) feature in CloudFront.
+Nowadays, there are much better options using Amazon CloudFront and CloudFront function. It's still serverless and supports `HTTPS` natively. It also enables new capabilities thanks to the newly released [KeyValue Store](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions.html) feature in CloudFront.
 
-This revised version will let you redirect subdomains to any other APEX domain, subdomains or URL.
+This revised version will let you redirect subdomains to any other top-level domain, subdomains or URL.
 
 ### Features
 
@@ -36,7 +36,7 @@ Examples:
 
 ### ⌨️ Configuration
 
-> ℹ️ Fill following parameters in the `Makefile` with your own values.
+> ℹ️ Fill the following parameters in the `Makefile` with your own values.
 
 ```bash
 ###################### Parameters ######################
@@ -71,7 +71,7 @@ CertificateArn := "arn:aws:acm:us-east-1:...." # us-east-1 Arn of ACM Public Cer
 
 ### ⌨️ Deployment
 
-> ℹ️ Run the following command (where your AWS CLI is authencated)
+> ℹ️ Run the following command (where your AWS CLI is authenticated)
 
 ```bash
     $ make requirements
